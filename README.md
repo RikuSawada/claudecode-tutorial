@@ -85,3 +85,5 @@ claude
 
 - [Claude Code 公式ドキュメント](https://docs.anthropic.com/claude-code)
 - [GitHub Issues（不具合報告・要望）](https://github.com/anthropics/claude-code/issues)
+- [効果的な CLAUDE.md の書き方](https://zenn.dev/farstep/articles/how-to-write-a-great-claude-md)
+- [個人的 CLAUDE.md のすゝめ](https://zenn.dev/solvio/articles/b53d24a41e6d5b)
