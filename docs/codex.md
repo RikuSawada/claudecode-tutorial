@@ -94,19 +94,34 @@ codex -a on-request -s workspace-write
 4. Claude Code は統合判断に集中する  
    例: 設計一貫性、仕様逸脱、リリース可否の確認
 
+### ClaudecodeとCodexをmcpで連携する
+コマンド一つで設定可能
+```shell
+claude mcp add codex codex mcp-server
+```
+
+確認
+```shell
+claude
+```
+MCPの状態を確認するには、以下のコマンドを使います。
+```shell
+/mcp
+```
+
+connectedと表示されれば成功です。
+```shell
+> /mcp
+╭────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ Manage MCP servers                                                                                                             │
+│                                                                                                                                │
+│ ❯ 1. codex               ✔ connected · Enter to view details
+```
+
 ### 具体例
 
 ```bash
-# 1) 実装をCodexに移譲
-codex exec "docs配下を除いて、ruffとmypyのエラーを修正して"
-
-# 2) 変更レビューをCodexに移譲
-codex review --uncommitted
-
-# 3) Claude Codeへは要約だけ渡す（長いログは渡さない）
-# - 変更ファイル
-# - 主要な修正方針
-# - 未解決事項
+Codex MCPを使って現在のコードの改善点を分析してください。
 ```
 
 ## 運用ルール（推奨）
@@ -120,3 +135,4 @@ codex review --uncommitted
 
 - [OpenAI Codex CLI GitHub](https://github.com/openai/codex)
 - [GitHub Agent HQ 公式ブログ](https://github.blog/jp/2026-02-05-pick-your-agent-use-claude-and-codex-on-agent-hq/)
+- [Claude CodeからCodexをMCPで呼び出せるようになった話](https://zenn.dev/tmasuyama1114/articles/cdfd4562bdce78)
