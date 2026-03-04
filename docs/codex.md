@@ -1,175 +1,122 @@
-# Codex（OpenAI Codex CLI）との連携
+# Codex（OpenAI Codex CLI）連携ガイド
 
----
+このドキュメントは `codex-cli 0.107.0` のヘルプ出力を基に更新しています（2026-03-04 確認）。
 
 ## Codex とは
 
-Codex は OpenAI が開発したターミナルで動く AI コーディングエージェントです。
-Claude Code と同様に自然言語でコード操作ができますが、特性が異なり **補完的な関係** にあります。
+Codex は OpenAI 製のターミナル型コーディングエージェントです。  
+対話だけでなく、非対話実行（`exec` / `review`）で定型作業をまとめて処理できます。
 
----
+## 先に修正した誤情報
 
-## Claude Code と Codex の違い
+以前の版にあった主な誤りは以下です。
 
-| 項目 | Claude Code | Codex |
-|-----|------------|-------|
-| 開発元 | Anthropic | OpenAI |
-| モデル | Claude | GPT / o4-mini |
-| 作業スタイル | 対話・協調ベース | 自律・成果ベース |
-| 得意領域 | 高速実装・調査・説明 | CI/CD・コードレビュー・セキュリティ |
-| 権限確認 | 細かく確認しながら進む | 自律実行（Full Auto モードあり） |
-| ライセンス | - | OSS（Apache 2.0） |
+- 設定ファイル拡張子は `~/.codex/config.yaml` ではなく `~/.codex/config.toml`
+- 承認モード名は `Suggest / Auto Edit / Full Auto` ではなく、`untrusted / on-request / never`（`on-failure` は非推奨）
+- `--approval-mode` ではなく `-a, --ask-for-approval` を使う
+- `--full-auto` は存在するが、これは「低摩擦なサンドボックス実行」のエイリアス
 
-### 使い分けの目安
-
-- **Claude Code が得意**: 対話しながら実装・コードの説明・調査・GitHub 操作
-- **Codex が得意**: 定型タスクの自動化・CI/CD・セキュリティチェック・高速プロトタイピング
-
----
-
-## Codex のインストール
+## インストール
 
 ```bash
-# グローバルインストール
+# npm
 npm install -g @openai/codex
 
-# OpenAI API キーを設定
-export OPENAI_API_KEY="your-api-key-here"
+# または Homebrew cask
+brew install --cask codex
 
-# 永続化する場合は .zshrc / .bashrc に追記
-echo 'export OPENAI_API_KEY="your-api-key-here"' >> ~/.zshrc
+# バージョン確認
+codex -V
 ```
 
----
-
-## 基本的な使い方
-
-### 対話モードで起動
+## 基本コマンド
 
 ```bash
+# 対話モード
 codex
+
+# 非対話で単発実行
+codex exec "テストを実行して失敗原因を修正して"
+
+# 変更差分レビュー
+codex review --uncommitted
 ```
 
-### 単発でタスクを実行
+## 重要オプション
 
 ```bash
-codex "このコードベースの構成を説明して"
-codex "テストを全て実行して失敗しているものを修正して"
-codex "セキュリティの脆弱性がないかチェックして"
+# モデル指定
+codex -m o3
+
+# 承認ポリシー（対話実行でも利用可）
+codex -a untrusted
+codex -a on-request
+codex -a never
+
+# サンドボックス
+codex -s read-only
+codex -s workspace-write
+codex -s danger-full-access
+
+# 低摩擦実行（on-request + workspace-write）
+codex --full-auto
 ```
 
-### モデルを指定する
+## 設定ファイル（TOML）
+
+`~/.codex/config.toml` に共通設定を書けます。
+
+```toml
+model = "o3"
+```
+
+承認ポリシーやサンドボックスは、バージョン差異を避けるためまず CLI オプション指定を推奨します。
 
 ```bash
-# デフォルトは o4-mini
-codex -m o3 "リファクタリングして"
+codex -a on-request -s workspace-write
 ```
 
----
+## Claude Code と連携して効率化する方法
 
-## 実行モード
+### 方針
 
-Codex には 3 つの実行モードがあります：
+- Claude Code: 要件整理、設計判断、説明、最終レビュー
+- Codex: 反復的な実装、テスト修正、機械的レビュー
 
-| モード | 説明 | 用途 |
-|-------|------|------|
-| **Suggest**（デフォルト） | ファイル書き込み・コマンド実行を毎回確認 | 通常の作業 |
-| **Auto Edit** | ファイル編集は自動、シェル実行のみ確認 | 実装作業の効率化 |
-| **Full Auto** | すべて自動実行（確認なし） | 信頼できるタスクの完全自動化 |
+### トークン消費を抑える実務パターン
+
+1. Claude Code でタスクを小さく分割する  
+   例: 「テスト修正」「lint修正」「型エラー修正」に分ける
+2. 各タスクを Codex `exec` へ移譲する  
+   例: `codex exec "pytest を実行して failing test をすべて修正"`
+3. 結果だけ Claude Code に戻す  
+   例: 変更ファイル一覧、要点、懸念点のみ共有
+4. Claude Code は統合判断に集中する  
+   例: 設計一貫性、仕様逸脱、リリース可否の確認
+
+### 具体例
 
 ```bash
-# Full Auto モードで実行
-codex --approval-mode full-auto "テストを修正して"
+# 1) 実装をCodexに移譲
+codex exec "docs配下を除いて、ruffとmypyのエラーを修正して"
+
+# 2) 変更レビューをCodexに移譲
+codex review --uncommitted
+
+# 3) Claude Codeへは要約だけ渡す（長いログは渡さない）
+# - 変更ファイル
+# - 主要な修正方針
+# - 未解決事項
 ```
 
----
+## 運用ルール（推奨）
 
-## GitHub Agent HQ での連携
-
-GitHub Copilot Pro+ / Enterprise ユーザーは、GitHub 上で Claude Code と Codex を同じ Issue に対して並行してアサインし、結果を比較・組み合わせることができます。
-
-### 使い方
-
-1. GitHub Issue を開く
-2. 右側のパネルから `Copilot` → エージェントを選択（Claude / Codex / Copilot）
-3. 複数のエージェントを同じ Issue にアサインして比較することも可能
-
-```
-# Issue のコメントで直接メンション
-@Claude この Issue を実装して
-@Codex セキュリティの観点でレビューして
-```
-
----
-
-## Claude Code と Codex を組み合わせるワークフロー
-
-### 実装フェーズごとに使い分ける
-
-```
-1. 設計・調査（Claude Code）
-   「この機能をどう実装するか調べて、方針を教えて」
-
-2. 実装（Claude Code）
-   「その方針で実装して」
-
-3. セキュリティレビュー（Codex）
-   codex "実装したコードのセキュリティチェックをして"
-
-4. テスト自動修正（Codex Full Auto）
-   codex --approval-mode full-auto "失敗しているテストを修正して"
-
-5. PR 作成（Claude Code）
-   「変更内容をまとめて PR を作成して」
-```
-
----
-
-## カスタムスキルで Codex を呼び出す
-
-`.claude/commands/` にスキルを定義して、Claude Code のセッション内から Codex を使うこともできます。
-
-`.claude/commands/codex-security.md`：
-
-```markdown
-以下のコマンドを実行して、セキュリティチェックを行ってください：
-
-```bash
-codex "このコードベースのセキュリティ脆弱性を洗い出して、レポートを security-report.md に出力して"
-```
-```
-
-呼び出し：
-
-```
-/codex-security
-```
-
----
-
-## 設定ファイル
-
-Codex の設定は `~/.codex/config.yaml` で管理できます：
-
-```yaml
-model: o4-mini
-approval_mode: suggest
-notify: true
-```
-
----
-
-## 注意事項
-
-- Codex の利用には **OpenAI API キー** が必要です（別途費用が発生します）
-- `Full Auto` モードは信頼できるリポジトリ・タスクにのみ使用してください
-- 機密情報を含むリポジトリで使用する際は、OpenAI のデータポリシーを確認してください
-- API キーは `.env` ファイルや環境変数で管理し、コードに直接書かないでください
-
----
+- 1タスク1目的で Codex に依頼する（プロンプトを短くする）
+- ログ全文を Claude Code に貼らず、要点3行で返す
+- 破壊的操作の可能性があるときは `-a untrusted` を使う
+- 信頼できるリポジトリでも `danger-full-access` は原則使わない
 
 ## 参考リンク
 
 - [OpenAI Codex CLI GitHub](https://github.com/openai/codex)
 - [GitHub Agent HQ 公式ブログ](https://github.blog/jp/2026-02-05-pick-your-agent-use-claude-and-codex-on-agent-hq/)
-- [Codex vs Claude Code 比較](https://blog.openreplay.com/openai-codex-vs-claude-code-cli-ai-tool/)
